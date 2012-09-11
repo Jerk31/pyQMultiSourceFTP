@@ -1,18 +1,16 @@
 # coding=utf-8
 
-import time
 from QMultiSourceFTP import QMultiSourceFTP
-from PyQt4.QtCore import QUrl, QFile, QTimer
+from PyQt4.QtCore import QUrl, QFile
+from PyQt4.QtGui import QApplication
 
 if __name__ == "__main__":
+    app = QApplication([])
+
     download = QMultiSourceFTP()
-    url = QUrl("ftp://10.31.40.160:2221/dossier1/c_un_test.mp3")
-    out_file = QFile("/home/jerk/a_suppr/c_un_test.mp3")
-    urls = list()
-    urls.append(url)
-    download.get(urls, 14950400, out_file)
+    url = QUrl("ftp://localhost:2221/series/sousdossier/sp.avi")
+    out_file = QFile("fichier.avi")
+    urls = [url]
+    download.get(urls, 184549376, out_file)
        
-    while True:
-        print "Etat : " + str(download.state)
-        time.sleep(1)
-        
+    app.exec_()
