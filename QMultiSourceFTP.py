@@ -14,15 +14,15 @@ class QMultiSourceFtp(QObject):
         QObject.__init__(self)
         # Vars
         self._parent        = parent
-        self._data          = []
-        self._urls          = None
+        self._data          = None
         self._size          = 0
         # Debug
         self.state          = -1
     
     # TODO : se débrouiller pour récupérer la taille du fichier...
-    def get(self, urls, size, out_file = None, _type = QFtp.Binary):
+    def get(self, urls, size, out_file=None, _type=QFtp.Binary):
         print "On a des URLs"
+        self._data = []
         if urls:
             self._urls = urls
             self._size = size
@@ -33,33 +33,38 @@ class QMultiSourceFtp(QObject):
             except OSError:
                 print "ERREUR : Dossier déjà existant"
             # Dividing the task between the peers
+            size_unit = self._size/len(urls)
             for i in range(len(urls)):
                 if i == 0:
-                    self._data.append( {'ftp':QFtp(self._parent), 'start':0, 'end':self._size/len(urls), 'isFinished':False} )
+                    self._data.append( {'ftp':QFtp(self._parent), 'start':0, 'end':size_unit, 'isFinished':False, 'url':urls[i]} )
                 elif i == len(urls)-1:
-                    self._data.append( {'ftp':QFtp(self._parent), 'start':(self._size/len(urls))*i + 1, 'end':self._size, 'isFinished':False} )
+                    self._data.append( {'ftp':QFtp(self._parent), 'start':(size_unit)*i + 1, 'end':self._size, 'isFinished':False, 'url':urls[i]} )
                 else:
-                    self._data.append( {'ftp':QFtp(self._parent), 'start':(self._size/len(urls))*i + 1, 'end':(self._size/len(urls))*i , 'isFinished':False} )
+                    self._data.append( {'ftp':QFtp(self._parent), 'start':(size_unit))*i + 1, 'end':(size_unit)*i , 'isFinished':False, 'url':urls[i]} )
                 print "Dans la boucle des taches : i=" +str(i)+" et data=" + str(self._data)
             # Starting all downloads
-            for i in range(len(urls)):
+            compteur = 0
+            for data in self._data:
+                ftp = data['ftp']
                 # On se connecte
-                print "Connecting to host :" + str(self._urls[i].host()) + " on port : " + str(self._urls[i].port(21))
-                self._data[i]['ftp'].connectToHost(self._urls[i].host(), self._urls[i].port(21))
+                print "Connecting to host :" + str(data['url'].host()) + " on port : " + str(data['url'].port(21))
+                ftp.connectToHost(data['url'].host(), data['url'].port(21))
                 # Login
                 print "Login"
-                self._data[i]['ftp'].login()
+                ftp.login()
                 # Creating File
-                out = out_file.fileName() + "/" + str(i) + ".part"
+                out = out_file.fileName() + "/" + str(compteur) + ".part"
                 print "Open file : " + out
                 out = QFile(out)
                 if out.open(QIODevice.WriteOnly):
-                    print "Lancement du download : " + out.fileName()  +" a partir de : "+ self._urls[i].path()       
-                    self._data[i]['ftp'].get(self._urls[i].path(), out , _type)
+                    print "Lancement du download : " + out.fileName()  +" a partir de : "+ data['url'].path()       
+                    ftp.get(data['url'].path(), out , _type)
                 # Signaux
-                self._data[i]['ftp'].done.connect(lambda x, i=i: self.download_finished(i, x))
-                self._data[i]['ftp'].dataTransferProgress.connect(self.data_transfer_progress)
-                self._data[i]['ftp'].stateChanged.connect(self.state_changed)
+                ftp.done.connect(lambda x, i=i: self.download_finished(i, x))
+                ftp.dataTransferProgress.connect(self.data_transfer_progress)
+                ftp.stateChanged.connect(self.state_changed)
+                # Incrémente le compteur
+                compteur += 1
                 
     def download_finished(self, i, _):
         # On met à jour le transfert qui vient de se finir
