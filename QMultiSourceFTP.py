@@ -40,14 +40,14 @@ class QMultiSourceFtp(QObject):
                 elif i == len(urls)-1:
                     self._data.append( {'ftp':QFtp(self._parent), 'start':(size_unit)*i + 1, 'end':self._size, 'isFinished':False, 'url':urls[i]} )
                 else:
-                    self._data.append( {'ftp':QFtp(self._parent), 'start':(size_unit))*i + 1, 'end':(size_unit)*i , 'isFinished':False, 'url':urls[i]} )
+                    self._data.append( {'ftp':QFtp(self._parent), 'start':(size_unit)*i + 1, 'end':(size_unit)*i , 'isFinished':False, 'url':urls[i]} )
                 print "Dans la boucle des taches : i=" +str(i)+" et data=" + str(self._data)
             # Starting all downloads
             compteur = 0
             for data in self._data:
                 ftp = data['ftp']
                 # On se connecte
-                print "Connecting to host :" + str(data['url'].host()) + " on port : " + str(data['url'].port(21))
+                print "Connecting to host : " + str(data['url'].host()) + " on port : " + str(data['url'].port(21))
                 ftp.connectToHost(data['url'].host(), data['url'].port(21))
                 # Login
                 print "Login"
