@@ -92,6 +92,3 @@ class QMultiSourceFtp(QObject):
         elif state == 3 or state == 4:
             print "TELECHARGEMENT"
         self.stateChanged.emit(state)
-        
-        
-        ############ POUET ############
