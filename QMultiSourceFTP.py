@@ -53,12 +53,10 @@ class QMultiSourceFtp(QObject):
                 print "Login"
                 ftp.login()
                 # Creating File
-                out = out_file.fileName() + "/" + str(compteur) + ".part"
-                print "Open file : " + out
-                out = QFile(out)
-                if out.open(QIODevice.WriteOnly):
-                    print "Lancement du download : " + out.fileName()  +" a partir de : "+ data['url'].path()       
-                    ftp.get(data['url'].path(), out , _type)
+                data['out'] = QFile(out_file.fileName() + "/" + str(compteur) + ".part")
+                if data['out'].open(QIODevice.WriteOnly):
+                    print "Lancement du download : " + data['out'].fileName()  +" a partir de : "+ data['url'].path()       
+                    ftp.get(data['url'].path(), data['out'] , _type)
                 # Signaux
                 ftp.done.connect(lambda x, i=i: self.download_finished(i, x))
                 ftp.dataTransferProgress.connect(self.data_transfer_progress)
