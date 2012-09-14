@@ -69,6 +69,8 @@ class QMultiSourceFtp(QObject):
         self._data[i]['isFinished'] = True
         # On arrete le FTP
         self._data[i]['ftp'].close()
+        # On ferme le fichier
+        self._data[i]['out'].close()
         # On vérifie que tous les transferts sont finis
         finished = True
         for p in self._data:
