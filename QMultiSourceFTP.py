@@ -84,7 +84,7 @@ class QMultiSourceFtp(QObject):
                 elif i == len(urls)-1:
                     self._data.append( {'start':(size_unit)*i + 1, 'end':self._size, 'isFinished':False, 'url':urls[i]} )
                 else:
-                    self._data.append( {'start':(size_unit)*i + 1, 'end':(size_unit)*i , 'isFinished':False, 'url':urls[i]} )
+                    self._data.append( {'start':(size_unit)*i + 1, 'end':(size_unit)*(i+1) , 'isFinished':False, 'url':urls[i]} )
                 print "Dans la boucle des taches : i=" +str(i)+" et data=" + str(self._data)
             # Starting all downloads
             compteur = 0
@@ -118,7 +118,6 @@ class QMultiSourceFtp(QObject):
         # On vérifie que tous les transferts sont finis
         finished = True
         for p in self._data:
-            print p
             finished = finished and p['isFinished']
         # Si oui, on envoie le signal :)
         if finished:
