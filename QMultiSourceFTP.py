@@ -1,7 +1,6 @@
 # coding=utf-8
 
 import os
-import time
 import ftplib
 from PyQt4.QtCore import QObject, pyqtSignal, QFile, QIODevice, QThread
 from PyQt4.QtNetwork import QFtp
@@ -101,7 +100,7 @@ class QMultiSourceFtp(QObject):
                     ftp.done.connect(lambda x, i=i: self.download_finished(i, x))
                     ftp.dataTransferProgress.connect(self.data_transfer_progress)
                     ftp.stateChanged.connect(self.state_changed)       
-                    ftp.run()
+                    ftp.start()
                 # Incrémente le compteur
                 compteur += 1
                 
