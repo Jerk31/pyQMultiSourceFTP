@@ -2,8 +2,52 @@
 
 import os
 import time
-from PyQt4.QtCore import QObject, pyqtSignal, QFile, QIODevice
+import ftplib
+from PyQt4.QtCore import QObject, pyqtSignal, QFile, QIODevice, QThread
 from PyQt4.QtNetwork import QFtp
+
+class DownloadPart(QThread):
+    """ Cette classe gère le téléchargement d'une partie de fichier """
+    """ Elle est basée sur ftplib """
+    dataTransferProgress = pyqtSignal(int, int)
+    done                 = pyqtSignal(bool)
+    stateChanged         = pyqtSignal(int)
+ 
+    def __init__(self, url, filename, start, end):
+        QThread.__init__(self)
+        self.localfile = open(filename , "wb")
+        self._start = start
+        self.to_read = end - start
+        self.url = url
+        self.ftp = ftplib.FTP(timeout=60)
+        self.canceled = False
+
+    def cancel(self):
+        self.canceled = True
+
+    def run(self):
+        self.stateChanged.emit(1)
+        self.ftp.connect(str(self.url.host()), int(self.url.port(21)))
+        self.stateChanged.emit(2)
+        self.stateChanged.emit(3)
+        self.ftp.login()
+        self.stateChanged.emit(4)
+
+        self.ftp.sendcmd("TYPE I")
+        data_read = 0
+        conn = self.ftp.transfercmd('RETR ' + str(self.url.path()), rest=self._start)
+        while data_read < self.to_read and not self.canceled:
+            chunk = conn.recv(8192)
+            size = min(self.to_read - data_read, len(chunk))
+            self.localfile.write(chunk[:size])
+            data_read += size
+            self.dataTransferProgress.emit(data_read, self.to_read)
+        self.stateChanged.emit(5)
+        conn.close()
+        self.localfile.close()
+        self.done.emit(not self.canceled)
+        self.stateChanged.emit(0)
+
 
 class QMultiSourceFtp(QObject):
     done                    = pyqtSignal(bool)
@@ -36,31 +80,28 @@ class QMultiSourceFtp(QObject):
             size_unit = self._size/len(urls)
             for i in range(len(urls)):
                 if i == 0:
-                    self._data.append( {'ftp':QFtp(self._parent), 'start':0, 'end':size_unit, 'isFinished':False, 'url':urls[i]} )
+                    self._data.append( {'start':0, 'end':size_unit, 'isFinished':False, 'url':urls[i]} )
                 elif i == len(urls)-1:
-                    self._data.append( {'ftp':QFtp(self._parent), 'start':(size_unit)*i + 1, 'end':self._size, 'isFinished':False, 'url':urls[i]} )
+                    self._data.append( {'start':(size_unit)*i + 1, 'end':self._size, 'isFinished':False, 'url':urls[i]} )
                 else:
-                    self._data.append( {'ftp':QFtp(self._parent), 'start':(size_unit)*i + 1, 'end':(size_unit)*i , 'isFinished':False, 'url':urls[i]} )
+                    self._data.append( {'start':(size_unit)*i + 1, 'end':(size_unit)*i , 'isFinished':False, 'url':urls[i]} )
                 print "Dans la boucle des taches : i=" +str(i)+" et data=" + str(self._data)
             # Starting all downloads
             compteur = 0
             for data in self._data:
-                ftp = data['ftp']
-                # On se connecte
-                print "Connecting to host : " + str(data['url'].host()) + " on port : " + str(data['url'].port(21))
-                ftp.connectToHost(data['url'].host(), data['url'].port(21))
-                # Login
-                print "Login"
-                ftp.login()
-                # Creating File
+                # Name of the file
                 data['out'] = QFile(out_file.fileName() + "/" + str(compteur) + ".part")
+                # FTP
+                data['ftp'] = DownloadPart(data['url'], data['out'].fileName(), data['start'], data['end'])
+                ftp = data['ftp']
+                # Creating File
                 if data['out'].open(QIODevice.WriteOnly):
-                    print "Lancement du download : " + data['out'].fileName()  +" a partir de : "+ data['url'].path()       
-                    ftp.get(data['url'].path(), data['out'] , _type)
-                # Signaux
-                ftp.done.connect(lambda x, i=i: self.download_finished(i, x))
-                ftp.dataTransferProgress.connect(self.data_transfer_progress)
-                ftp.stateChanged.connect(self.state_changed)
+                    print "Lancement du download : " + data['out'].fileName()  +" a partir de : "+ data['url'].path()
+                    # Signaux
+                    ftp.done.connect(lambda x, i=i: self.download_finished(i, x))
+                    ftp.dataTransferProgress.connect(self.data_transfer_progress)
+                    ftp.stateChanged.connect(self.state_changed)       
+                    ftp.run()
                 # Incrémente le compteur
                 compteur += 1
                 
@@ -68,9 +109,7 @@ class QMultiSourceFtp(QObject):
         # On met à jour le transfert qui vient de se finir
         self._data[i]['isFinished'] = True
         # On arrete le FTP
-        self._data[i]['ftp'].close()
-        # On ferme le fichier
-        self._data[i]['out'].close()
+        self._data[i]['ftp'].quit()
         # On vérifie que tous les transferts sont finis
         finished = True
         for p in self._data:
@@ -78,7 +117,6 @@ class QMultiSourceFtp(QObject):
         # Si oui, on envoie le signal :)
         if finished:
             print "FINI !!!!!!"
-            time.sleep(1)
             self.done.emit(_)
             
     def data_transfer_progress(self, read, total):
