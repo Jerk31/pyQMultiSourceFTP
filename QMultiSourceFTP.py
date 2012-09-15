@@ -10,7 +10,7 @@ class DownloadPart(QThread):
     """ Cette classe gère le téléchargement d'une partie de fichier """
     """ Elle est basée sur ftplib """
     dataTransferProgress = pyqtSignal(int, int)
-    done                 = pyqtSignal(bool)
+    done                 = pyqtSignal(bool, object)
     stateChanged         = pyqtSignal(int)
  
     def __init__(self, url, filename, start, end):
@@ -45,7 +45,7 @@ class DownloadPart(QThread):
         self.stateChanged.emit(5)
         conn.close()
         self.localfile.close()
-        self.done.emit(not self.canceled)
+        self.done.emit(not self.canceled, self)
         self.stateChanged.emit(0)
 
 
@@ -98,21 +98,27 @@ class QMultiSourceFtp(QObject):
                 if data['out'].open(QIODevice.WriteOnly):
                     print "Lancement du download : " + data['out'].fileName()  +" a partir de : "+ data['url'].path()
                     # Signaux
-                    ftp.done.connect(lambda x, i=i: self.download_finished(i, x))
+                    ftp.done.connect(self.download_finished)
                     ftp.dataTransferProgress.connect(self.data_transfer_progress)
                     ftp.stateChanged.connect(self.state_changed)       
-                    ftp.run()
-                # Incrémente le compteur
-                compteur += 1
+                    ftp.start()
+                    # Incrémente le compteur
+                    compteur += 1
                 
-    def download_finished(self, i, _):
+    def download_finished(self, _, instance):
+        data = None
+        # On cherche la bonne data
+        for d in self._data:
+            if d['ftp'] == instance:
+                data = d
         # On met à jour le transfert qui vient de se finir
-        self._data[i]['isFinished'] = True
+        data['isFinished'] = True
         # On arrete le FTP
-        self._data[i]['ftp'].quit()
+        data['ftp'].exit()
         # On vérifie que tous les transferts sont finis
         finished = True
         for p in self._data:
+            print p
             finished = finished and p['isFinished']
         # Si oui, on envoie le signal :)
         if finished:
@@ -120,7 +126,7 @@ class QMultiSourceFtp(QObject):
             self.done.emit(_)
             
     def data_transfer_progress(self, read, total):
-        print "On avance : " + str(read) + "/" + str(total)
+        #print "On avance : " + str(read) + "/" + str(total)
         self.dataTransferProgress.emit(read, total)
         
     def state_changed(self, state):

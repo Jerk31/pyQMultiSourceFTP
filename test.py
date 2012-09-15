@@ -14,8 +14,9 @@ if __name__ == "__main__":
 
     download = QMultiSourceFtp()
     url = QUrl("ftp://localhost:2221/dossier1/c_un_test.mp3")
+    url2 = QUrl("ftp://localhost:2221/dossier2/c_un_test.mp3")
     out_file = QFile("c_un_test.mp3")
-    urls = [url]
+    urls = [url, url2]
     # Signaux
     download.done.connect(download_termine)
     
@@ -23,4 +24,4 @@ if __name__ == "__main__":
     download.get(urls, 14950400, out_file)
        
         
-    sys.exit(app.exec_())  
+    app.exec_()
