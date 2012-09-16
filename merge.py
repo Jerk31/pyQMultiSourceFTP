@@ -1,3 +1,5 @@
+# coding=utf-8
+
 def merge_files(input_files, out_filename):
     """ Merge les fichiers """
     """ arguments :  (['0.part', '1.part'], 'merged.avi') """
