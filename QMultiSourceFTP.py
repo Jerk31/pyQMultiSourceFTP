@@ -150,7 +150,7 @@ class QMultiSourceFtp(QObject):
             print "FINI !!!!!!"
             self.done.emit(_)
             
-    def data_transfer_progress(self, read, total, instance):
+    def data_transfer_progress(self, read, total):
         #print "On avance : " + str(self._read) + "/" + str(self._size)
         self.dataTransferProgress.emit(read, total)
         
