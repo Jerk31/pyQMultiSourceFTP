@@ -39,7 +39,6 @@ class QMultiSourceFtp(QObject):
             t_ftp.close()
             self._urls = urls
             # Creating temporary folder
-            # TODO : gérer les cas de conflit de dossier déjà existant...
             if not resume:
                 try:
                     print "Création du dossier " + str(out_file.fileName())
@@ -68,18 +67,18 @@ class QMultiSourceFtp(QObject):
                 # Load du fichier .info
                 compteur = 0
                 size_unit = self._size/len(urls)
-                print "On ouvre le fichier " + out_file.fileName()+".info"
+                #print "On ouvre le fichier " + out_file.fileName()+".info"
                 with codecs.open(out_file.fileName()+".info", "r", "utf-8") as config:
                     conf_read = [ line for line in config ]
-                    print conf_read
+                    #print conf_read
                     max_compteur = len(conf_read)
-                    print "Nombre de lignes : " + str(max_compteur)
+                    #print "Nombre de lignes : " + str(max_compteur)
                     # Lit la config et la met dans le dico
                     for line in conf_read:
                         if "=" in line:
-                            print "Splitting line"
+                            #print "Splitting line"
                             name, start = line.split("=")
-                            print "Name = " +str(name) + " and start = " +str(start)
+                            #print "Name = " +str(name) + " and start = " +str(start)
                             self._data.append( {'out':QFile(name), 'start':start, 'isFinished':True, 'old':True} )
                             # Pour chaque partie regarde à quel bit ça c'est arreté
                             size = os.path.getsize(name)                    
