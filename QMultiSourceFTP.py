@@ -22,18 +22,22 @@ class QMultiSourceFtp(QObject):
         self._data          = None
         self._size          = 0
         self._out_file      = None
-        # Debug
-        self.state          = -1
+        self._read          = None
     
-    # TODO : se débrouiller pour récupérer la taille du fichier...
-    def get(self, urls, size, out_file=None, _type=QFtp.Binary):
-        print "On a des URLs"
+    def get(self, urls, out_file=None, _type=QFtp.Binary):
         self._data = []
         self._out_file = out_file
         if urls:
+            # On récupère la taille du fichier distant
+            t_ftp = ftplib.FTP(timeout=60)
+            t_ftp.connect(str(urls[0].host()), str(urls[0].port(21)))
+            t_ftp.login()
+            t_ftp.sendcmd("TYPE I")
+            self._size = t_ftp.size(str(urls[0].path()))
+            t_ftp.close()
             self._urls = urls
-            self._size = size
             # Creating temporary folder
+            # TODO : gérer les cas de conflit de dossier déjà existant...
             try:
                 print "Création du dossier " + str(out_file.fileName())
                 os.mkdir(str(out_file.fileName()))
@@ -48,7 +52,7 @@ class QMultiSourceFtp(QObject):
                     self._data.append( {'start':(size_unit)*i + 1, 'end':self._size, 'isFinished':False, 'url':urls[i]} )
                 else:
                     self._data.append( {'start':(size_unit)*i + 1, 'end':(size_unit)*(i+1) , 'isFinished':False, 'url':urls[i]} )
-                print "Dans la boucle des taches : i=" +str(i)+" et data=" + str(self._data)
+                #print "Dans la boucle des taches : i=" +str(i)+" et data=" + str(self._data)
             # Starting all downloads
             compteur = 0
             for data in self._data:
@@ -86,8 +90,7 @@ class QMultiSourceFtp(QObject):
         if finished:
             file_list = []
             # On merge
-            for d in self._data:
-                file_list.append(d['out'].fileName())
+            file_list = [ d['out'].fileName() for d in self._data ]
             merge_files(file_list, self._out_file.fileName()+".new")
             # On vire le répertoire
             shutil.rmtree(str(self._out_file.fileName()))
@@ -97,13 +100,13 @@ class QMultiSourceFtp(QObject):
             self.done.emit(_)
             
     def data_transfer_progress(self, read, total):
-        #print "On avance : " + str(read) + "/" + str(total)
+        self._read = read
+        print "On avance : " + str(self._read) + "/" + str(self._size)
         self.dataTransferProgress.emit(read, total)
         
     def state_changed(self, state):
-        self.state = state
-        if state == 1 or state == 2:
+        if state == 1:
             print "CONNEXION"
-        elif state == 3 or state == 4:
+        elif state == 3:
             print "TELECHARGEMENT"
         self.stateChanged.emit(state)

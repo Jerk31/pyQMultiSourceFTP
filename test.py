@@ -23,7 +23,7 @@ if __name__ == "__main__":
     download.done.connect(download_termine)
     
     
-    download.get(urls, 69958176, out_file)
+    download.get(urls, out_file)
        
         
     app.exec_()

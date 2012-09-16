@@ -12,7 +12,11 @@ class DownloadPart(QThread):
  
     def __init__(self, url, filename, start, end):
         QThread.__init__(self)
-        self.localfile = open(filename , "wb")
+        try:
+            self.localfile = open(filename , "wb")
+        except IOError:
+            print "ERREUR : un fichier existe déjà avec ce nom"
+            return
         self._start = start
         self.to_read = end - start
         self.url = url
