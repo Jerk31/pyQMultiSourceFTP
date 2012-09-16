@@ -9,6 +9,7 @@ def merge_files(input_files, out_filename):
         print "Using file : " + part_file
         f = open(part_file, 'r')
     
+        # On peut pas chunker plus gros? Parce que pour des vidéos ça va prendre pas mal de temps ...
         chunk = f.read(8192)
         while chunk:
             out_file.write(chunk)

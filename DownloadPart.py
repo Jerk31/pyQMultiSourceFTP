@@ -6,7 +6,7 @@ from PyQt4.QtCore import QUrl, QFile, pyqtSignal, QThread
 class DownloadPart(QThread):
     """ Cette classe gère le téléchargement d'une partie de fichier """
     """ Elle est basée sur ftplib """
-    dataTransferProgress = pyqtSignal(int, int)
+    dataTransferProgress = pyqtSignal(int, int, object)
     done                 = pyqtSignal(bool, object)
     stateChanged         = pyqtSignal(int)
  
@@ -42,7 +42,7 @@ class DownloadPart(QThread):
             size = min(self.to_read - data_read, len(chunk))
             self.localfile.write(chunk[:size])
             data_read += size
-            self.dataTransferProgress.emit(data_read, self.to_read)
+            self.dataTransferProgress.emit(data_read, self.to_read, self)
         self.stateChanged.emit(5)
         conn.close()
         self.localfile.close()
