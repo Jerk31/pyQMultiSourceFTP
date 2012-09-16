@@ -68,7 +68,7 @@ class QMultiSourceFtp(QObject):
                 compteur = 0
                 size_unit = self._size/len(urls)
                 #print "On ouvre le fichier " + out_file.fileName()+".info"
-                with codecs.open(out_file.fileName()+".info", "r", "utf-8") as config:
+                with codecs.open(out_file.fileName()+"/"+out_file.fileName()+".info", "r", "utf-8") as config:
                     conf_read = [ line for line in config ]
                     #print conf_read
                     max_compteur = len(conf_read)
@@ -79,7 +79,7 @@ class QMultiSourceFtp(QObject):
                             #print "Splitting line"
                             name, start = line.split("=")
                             #print "Name = " +str(name) + " and start = " +str(start)
-                            self._data.append( {'out':QFile(name), 'start':start, 'isFinished':True, 'old':True} )
+                            self._data.append( {'out':QFile(name), 'start':int(start), 'isFinished':True, 'old':True} )
                             # Pour chaque partie regarde à quel bit ça c'est arreté
                             size = os.path.getsize(name)                    
                             # Si on avait pas fini de download, on relance un download :)
@@ -92,8 +92,8 @@ class QMultiSourceFtp(QObject):
             # Starting all downloads
             compteur = 0
             # Opening part index file
-            config = QFile(out_file.fileName()+".info")
-            if config.open(QIODevice.WriteOnly):
+            config = QFile(str(out_file.fileName())+"/"+str(out_file.fileName())+".info")
+            if config.open(QIODevice.Append):
                 for data in self._data:
                     if 'old' not in data:
                         if 'out' not in data:
@@ -118,10 +118,7 @@ class QMultiSourceFtp(QObject):
     def download_finished(self, _, instance):
         data = None
         # On cherche la bonne data
-        for d in self._data:
-            if 'ftp' in d:
-                if d['ftp'] == instance:
-                    data = d
+        data = [d for d in self._data if 'ftp' in d and d['ftp'] == instance][0]
         # On met à jour le transfert qui vient de se finir
         data['isFinished'] = True
         # On arrete le FTP
@@ -133,9 +130,12 @@ class QMultiSourceFtp(QObject):
         # Si oui, on merge et on envoie le signal :)
         if finished:
             # On fait une jolie liste sortie comme on veut
+            print self._data
             new_data = sorted(self._data, key=itemgetter('start')) 
+            print new_data
             # On merge
             file_list = [ d['out'].fileName() for d in new_data ]
+            print file_list
             merge_files(file_list, self._out_file.fileName()+".new")
             # On vire le répertoire
             shutil.rmtree(str(self._out_file.fileName()))
@@ -143,7 +143,7 @@ class QMultiSourceFtp(QObject):
             os.rename(self._out_file.fileName()+".new", self._out_file.fileName())
             # On supprime le fichier des parts s'il existe
             try :
-                os.remove(str(self._out_file.fileName()) + ".info")
+                os.remove(str(out_file.fileName())+"/"+str(self._out_file.fileName()) + ".info")
             except:
                 pass
             print "FINI !!!!!!"
