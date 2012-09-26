@@ -13,11 +13,24 @@ from DownloadPart import DownloadPart
 from merge import merge_files
 
 class QMultiSourceFtp(QObject):
+    """ Cette classe gère le téléchargement multi-source en utilisant DownloadPart """
     done                    = pyqtSignal(bool)
     stateChanged            = pyqtSignal(int)
     dataTransferProgress    = pyqtSignal(int, int)
     
     def __init__(self, parent=None):
+        """ Structure du dico data pour chacun des morceaux du téléchargement :
+        [Toujours présent]
+        'start'         => l'octet de début du morceau
+        'isFinished'    => True si on a fini de télécharger ce morceau
+        'out'           => le nom du morceau sur le pc
+        [Seulement si non fini]                          
+        'end'           => l'octet de fin du morceau                            
+        'url'           => l'url qu'il utilise pour se télécharger
+        'ftp'           => l'instance de la classe DownloadPart qu'il utilise
+        [Seulement si resume]
+        'old'           => True si le morceau est un vieux morceau              
+        """
         QObject.__init__(self)
         # Vars
         self._parent        = parent
@@ -31,7 +44,7 @@ class QMultiSourceFtp(QObject):
         self._out_file = out_file
         if urls:
             # On récupère la taille du fichier distant
-						# TODO: Gérer problème de connexion ou de fichier non trouvé.
+			# TODO: Gérer problème de connexion ou de fichier non trouvé.
             t_ftp = ftplib.FTP(timeout=60)
             t_ftp.connect(str(urls[0].host()), str(urls[0].port(21)))
             t_ftp.login()
@@ -57,11 +70,11 @@ class QMultiSourceFtp(QObject):
                 size_unit = self._size/len(urls)
                 for i in range(len(urls)):
                     if i == 0:
-                        self._data.append( {'start':0, 'end':size_unit, 'isFinished':False, 'url':urls[i]} )
+                        self._data.append( {'start':0, 'end':size_unit, 'downloaded':0, 'isFinished':False, 'url':urls[i]} )
                     elif i == len(urls)-1:
-                        self._data.append( {'start':(size_unit)*i + 1, 'end':self._size, 'isFinished':False, 'url':urls[i]} )
+                        self._data.append( {'start':(size_unit)*i + 1, 'end':self._size, 'downloaded':0, 'isFinished':False, 'url':urls[i]} )
                     else:
-                        self._data.append( {'start':(size_unit)*i + 1, 'end':(size_unit)*(i+1) , 'isFinished':False, 'url':urls[i]} )
+                        self._data.append( {'start':(size_unit)*i + 1, 'end':(size_unit)*(i+1) , 'downloaded':0, 'isFinished':False, 'url':urls[i]} )
                     #print "Dans la boucle des taches : i=" +str(i)+" et data=" + str(self._data)
                     
             else:       # Resume download
@@ -69,7 +82,7 @@ class QMultiSourceFtp(QObject):
                 compteur = 0
                 size_unit = self._size/len(urls)
                 #print "On ouvre le fichier " + out_file.fileName()+".info"
-                with codecs.open(out_file.fileName()+"/"+out_file.fileName()+".info", "r", "utf-8") as config:
+                with codecs.open(out_file.fileName()+"/infos", "r", "utf-8") as config:
                     conf_read = [ line for line in config ]
                     #print conf_read
                     max_compteur = len(conf_read)
@@ -80,20 +93,20 @@ class QMultiSourceFtp(QObject):
                             #print "Splitting line"
                             name, start = line.split("=")
                             #print "Name = " +str(name) + " and start = " +str(start)
-                            self._data.append( {'out':QFile(name), 'start':int(start), 'isFinished':True, 'old':True} )
+                            self._data.append( {'out':QFile(name), 'start':int(start), 'downloaded':os.path.getsize(name), 'isFinished':True, 'old':True} )
                             # Pour chaque partie regarde à quel bit ça c'est arreté
                             size = os.path.getsize(name)                    
                             # Si on avait pas fini de download, on relance un download :)
                             if size != (size_unit)*(compteur+1):
                                 self._data.append( {'out':QFile(out_file.fileName()+"/"+str(max_compteur)+".part"), \
-                                                    'start':size, 'end':(size_unit)*(compteur+1), 'isFinished':False, \
-                                                    'url':urls[compteur]} )
+                                                    'start':size, 'end':(size_unit)*(compteur+1), 'downloaded':size, \
+                                                    'isFinished':False, 'url':urls[compteur]} )
                                 max_compteur += 1        
                             
             # Starting all downloads
             compteur = 0
             # Opening part index file
-            config = QFile(str(out_file.fileName())+"/"+str(out_file.fileName())+".info")
+            config = QFile(str(out_file.fileName())+"/infos")
             if config.open(QIODevice.Append):
                 for data in self._data:
                     if 'old' not in data:
@@ -131,12 +144,9 @@ class QMultiSourceFtp(QObject):
         # Si oui, on merge et on envoie le signal :)
         if finished:
             # On fait une jolie liste sortie comme on veut
-            print self._data
             new_data = sorted(self._data, key=itemgetter('start')) 
-            print new_data
             # On merge
             file_list = [ d['out'].fileName() for d in new_data ]
-            print file_list
             merge_files(file_list, self._out_file.fileName()+".new")
             # On vire le répertoire
             shutil.rmtree(str(self._out_file.fileName()))
@@ -144,15 +154,23 @@ class QMultiSourceFtp(QObject):
             os.rename(self._out_file.fileName()+".new", self._out_file.fileName())
             # On supprime le fichier des parts s'il existe
             try :
-                os.remove(str(out_file.fileName())+"/"+str(self._out_file.fileName()) + ".info")
+                os.remove(str(out_file.fileName())+"/infos")
             except:
                 pass
             print "FINI !!!!!!"
             self.done.emit(_)
             
-    def data_transfer_progress(self, read, total):
-        #print "On avance : " + str(self._read) + "/" + str(self._size)
-        self.dataTransferProgress.emit(read, total)
+    def data_transfer_progress(self, read, total, instance):
+        # TODO : optimiser tout ça, on ne devrait pas avoir à faire une boucle pour chercher la bonne data :/
+        # On cherche la bonne data
+        data = [d for d in self._data if 'ftp' in d and d['ftp'] == instance][0]
+        data['downloaded'] = read
+        # On calcule le total téléchargé
+        currently_downloaded = 0
+        for d in self._data:
+            currently_downloaded += d['downloaded']
+        print "On a déjà téléchargé : " + str(currently_downloaded) + " sur : " + str(self._size)
+        self.dataTransferProgress.emit(currently_downloaded, self._size)
         
     def state_changed(self, state):
         if state == 1:
