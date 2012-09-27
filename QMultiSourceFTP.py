@@ -44,7 +44,7 @@ class QMultiSourceFtp(QObject):
         self._out_file = out_file
         if urls:
             # On récupère la taille du fichier distant
-			# TODO: Gérer problème de connexion ou de fichier non trouvé.
+            # TODO: Gérer problème de connexion ou de fichier non trouvé.
             t_ftp = ftplib.FTP(timeout=60)
             t_ftp.connect(str(urls[0].host()), str(urls[0].port(21)))
             t_ftp.login()
