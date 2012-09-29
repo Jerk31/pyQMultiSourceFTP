@@ -1,8 +1,7 @@
 # coding=utf-8
 
-import sys
 from QMultiSourceFTP import QMultiSourceFtp
-from PyQt4.QtCore import QUrl, QFile
+from PyQt4.QtCore import QUrl
 from PyQt4.QtGui import QApplication
 
 def download_termine(b):
@@ -17,7 +16,7 @@ if __name__ == "__main__":
     url2 = QUrl("ftp://localhost:2221/dossier2/c_un_test.mp3")
     url3 = QUrl("ftp://localhost:2221/dossier3/c_un_test.mp3")
     url4 = QUrl("ftp://localhost:2221/dossier4/c_un_test.mp3")
-    out_file = QFile("c_un_test.mp3")
+    out_file = "c_un_test.mp3"
     urls = [url, url2, url3, url4]
     # Signaux
     download.done.connect(download_termine)
