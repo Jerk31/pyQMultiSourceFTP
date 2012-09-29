@@ -10,11 +10,24 @@ from DownloadPart import DownloadPart
 from merge import merge_files
 
 class QMultiSourceFtp(QObject):
+    """ Cette classe gère le téléchargement multi-source en utilisant DownloadPart """
     done                    = pyqtSignal(bool)
     stateChanged            = pyqtSignal(int)
     dataTransferProgress    = pyqtSignal(int, int)
     
     def __init__(self, parent=None):
+        """ Structure du dico data pour chacun des morceaux du téléchargement :
+        [Toujours présent]
+        'start'         => l'octet de début du morceau
+        'isFinished'    => True si on a fini de télécharger ce morceau
+        'out'           => le nom du morceau sur le pc
+        [Seulement si non fini]                          
+        'end'           => l'octet de fin du morceau                            
+        'url'           => l'url qu'il utilise pour se télécharger
+        'ftp'           => l'instance de la classe DownloadPart qu'il utilise
+        [Seulement si resume]
+        'old'           => True si le morceau est un vieux morceau              
+        """
         QObject.__init__(self)
         # Vars
         self._parent        = parent
@@ -139,10 +152,7 @@ class QMultiSourceFtp(QObject):
 
         data = None
         # On cherche la bonne data
-        for d in self._data:
-            if 'ftp' in d:
-                if d['ftp'] == instance:
-                    data = d
+        data = [d for d in self._data if 'ftp' in d and d['ftp'] == instance][0]
         # On met à jour le transfert qui vient de se finir
         data['isFinished'] = ok #XXX
         # On arrete le FTP
@@ -157,9 +167,17 @@ class QMultiSourceFtp(QObject):
             print "FINI !!!!!!"
             self.done.emit(False)
             
-    def data_transfer_progress(self, read, total):
-        #print "On avance : " + str(self._read) + "/" + str(self._size)
-        self.dataTransferProgress.emit(read, total)
+    def data_transfer_progress(self, read, total, instance):
+        # TODO : optimiser tout ça, on ne devrait pas avoir à faire une boucle pour chercher la bonne data :/
+        # On cherche la bonne data
+        data = [d for d in self._data if 'ftp' in d and d['ftp'] == instance][0]
+        data['downloaded'] = read
+        # On calcule le total téléchargé
+        currently_downloaded = 0
+        for d in self._data:
+            currently_downloaded += d['downloaded']
+        print "On a déjà téléchargé : " + str(currently_downloaded) + " sur : " + str(self._size)
+        self.dataTransferProgress.emit(currently_downloaded, self._size)
         
     def state_changed(self, state):
         if state == 1:
