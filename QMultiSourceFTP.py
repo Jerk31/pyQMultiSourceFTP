@@ -4,7 +4,7 @@ import os
 import ftplib
 import shutil
 from operator import itemgetter
-from PyQt4.QtCore import QObject, pyqtSignal, QFile, QIODevice
+from PyQt4.QtCore import QObject, pyqtSignal
 
 from DownloadPart import DownloadPart
 from merge import merge_files
@@ -25,8 +25,6 @@ class QMultiSourceFtp(QObject):
         'end'           => l'octet de fin du morceau                            
         'url'           => l'url qu'il utilise pour se télécharger
         'ftp'           => l'instance de la classe DownloadPart qu'il utilise
-        [Seulement si resume]
-        'old'           => True si le morceau est un vieux morceau              
         """
         QObject.__init__(self)
         # Vars
@@ -75,71 +73,50 @@ class QMultiSourceFtp(QObject):
             # Dividing the task between the peers
             size_unit = self._size/len(urls)
             for i in range(len(urls)):
-                if i == 0:
-                    self._data.append( {'start':0, 'end':size_unit, 'isFinished':False, 'url':urls[i]} )
-                elif i == len(urls)-1:
-                    self._data.append( {'start':(size_unit)*i + 1, 'end':self._size, 'isFinished':False, 'url':urls[i]} )
-                else:
-                    self._data.append( {'start':(size_unit)*i + 1, 'end':(size_unit)*(i+1) , 'isFinished':False, 'url':urls[i]} )
-                #print "Dans la boucle des taches : i=" +str(i)+" et data=" + str(self._data)
+                self._data.append({'start': size_unit * i, 'end': size_unit * (i + 1), 'isFinished': False, 'url': urls[i], 'out': str(i) + '.part'})
                 
         else:       # Resume download
             # Load du fichier .info
-            compteur = 0
             size_unit = self._size/len(urls)
             #print "On ouvre le fichier " + out_file.fileName()+".info"
             conf_read = [line for line in open(out_filename + '/info')]
-            #print conf_read
-            max_compteur = len(conf_read)
-            #print "Nombre de lignes : " + str(max_compteur)
             # Lit la config et la met dans le dico
             for line in conf_read:
                 if "=" in line:
                     #print "Splitting line"
                     name, start = line.split("=")
-                    #print "Name = " +str(name) + " and start = " +str(start)
-                    self._data.append( {'out':QFile(name), 'start':start, 'isFinished':True, 'old':True} )
+
                     # Pour chaque partie regarde à quel bit ça c'est arreté
                     size = os.path.getsize(name)
 
-                    if size != (size_unit)*(compteur+1):
-                        self._data.append( {'out':QFile(out_filename + '/' + str(max_compteur) + '.part'), \
-                                            'start':size, 'end':(size_unit)*(compteur+1), 'isFinished':False, \
-                                            'url':urls[compteur]} )
-                        max_compteur += 1        
+                    #print "Name = " +str(name) + " and start = " +str(start)
+                    self._data.append({'out': name, 'start': start, 'end': size, 'isFinished': True, 'old': True})
                         
         # Starting all downloads
-        compteur = 0
         # Opening part index file
         config = open(out_filename + '/info', 'w')
 
         if config:
             for data in self._data:
-                if 'old' not in data:
-                    if 'out' not in data:
-                        # Name of the file
-                        data['out'] = QFile(out_filename + "/" + str(compteur) + ".part")
                     # FTP
-                    data['ftp'] = DownloadPart(data['url'], data['out'].fileName(), data['start'], data['end'])
+                    data['ftp'] = DownloadPart(data['url'], out_filename + '/' + data['out'], data['start'], data['end'])
                     ftp = data['ftp']
                     # Creating File
-                    if data['out'].open(QIODevice.WriteOnly):
-                        print "Lancement du download : " + data['out'].fileName()  +" a partir de : "+ data['url'].path()
-                        config.write(str(data['out'].fileName()) + "=" + str(data['start']) +"\n")    
+                    if open(data['out'], 'w'):
+                        print "Lancement du download : " + data['out'] + " a partir de : "+ data['url'].path()
+                        config.write(data['out'] + "=" + str(data['start']) +"\n")    
                         # Signaux
                         ftp.done.connect(self.download_finished)
                         ftp.dataTransferProgress.connect(self.data_transfer_progress)
                         ftp.stateChanged.connect(self.state_changed)       
                         ftp.start()
-                        # Incrémente le compteur
-                        compteur += 1
         config.close()
  
     def _merge(self):
         # On fait une jolie liste sortie comme on veut
         new_data = sorted(self._data, key=itemgetter('start')) 
         # On merge
-        file_list = [ d['out'].fileName() for d in new_data ]
+        file_list = [self._out_filename + '/' + d['out'] for d in new_data]
         merge_files(file_list, self._out_filename + '.new')
         # On vire le répertoire
         shutil.rmtree(self._out_filename)
