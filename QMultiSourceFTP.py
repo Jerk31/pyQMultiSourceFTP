@@ -51,21 +51,22 @@ class QMultiSourceFtp(QObject):
         whites = []
 
         chunks = sorted(self._data, key=lambda x: x['start'])
+        print "c", chunks
         size = self._size
 
         if len(chunks) > 0:
             if chunks[0]['start'] > 0:
-                whites.append({'start': 0, 'end': chunks[0][1], 'free': True})
+                whites.append({'start': 0, 'end': chunks[0]['start'], 'free': True})
             
             for i in range(len(chunks) - 1):
-                if chunks[i]['end'] < chunks[i+1][1]:
-                    whites.append({'start': chunks[i][2], 'end': chunks[i+1][1], 'free': True})
+                if chunks[i]['end'] < chunks[i+1]['start']:
+                    whites.append({'start': chunks[i]['end'], 'end': chunks[i+1]['start'], 'free': True})
             
             if chunks[-1]['end'] < size:
-                whites.append({'start': chunks[-1][2], 'end': size, 'free': True})
+                whites.append({'start': chunks[-1]['end'], 'end': size, 'free': True})
         else:
             whites.append({'start': 0, 'end': size, 'free': True})
-
+        print "w:", whites
         return whites
 
     def _create_dir(self):
@@ -91,10 +92,10 @@ class QMultiSourceFtp(QObject):
                 name, start = line.split("=")
                 start = int(start)
                 # Pour chaque partie regarde à quel bit ça c'est arreté
-                size = os.path.getsize(name)
+                size = os.path.getsize(self._out_filename + '/' + name)
 
                 #print "Name = " +str(name) + " and start = " +str(start)
-                self._data.append({'out': name, 'start': start, 'end': start + size, 'isFinished': True})
+                self._data.append({'out': name, 'start': start, 'end': start + size, 'isFinished': True, 'downloaded': size})
 
                 self._compteur += 1
 
@@ -152,6 +153,9 @@ class QMultiSourceFtp(QObject):
             self._create_dir()
          
         self._do_distribution()
+
+        print self._data
+
         self._start_all()
         self._write_config()
 
@@ -164,6 +168,7 @@ class QMultiSourceFtp(QObject):
                 # FTP
                 ftp = DownloadPart(data['url'], self._out_filename + '/' + data['out'], data['start'], data['end'])
                 data['ftp'] = ftp
+                data['downloaded'] = 0
                 print "Lancement du download : " + data['out'] + " a partir de : "+ data['url'].path()
                 # Signaux
                 ftp.done.connect(self.download_finished)
