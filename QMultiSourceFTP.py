@@ -68,51 +68,37 @@ class QMultiSourceFtp(QObject):
 
         return whites
 
-
-    def get(self, urls, out_filename, resume=False):
-        self._compteur = 0
-        self._data = []
-        self._out_filename = out_filename
-        self._urls = urls
-
-        if not urls:
-            return
-
-        self._size = self._get_size(urls)
-
-        # Creating temporary folder
-        if not resume:
+    def _create_dir(self):
+        out_filename = self._out_filename
+        try:
+            print "Création du dossier " + str(out_filename)
+            os.mkdir(out_filename)
+        except OSError:
+            # On supprime le dossier existant et on en créé un autre
             try:
-                print "Création du dossier " + str(out_filename)
-                os.mkdir(out_filename)
+                shutil.rmtree(self._out_filename)
             except OSError:
-                # On supprime le dossier existant et on en créé un autre
-                try:
-                    shutil.rmtree(self._out_filename)
-                except OSError:
-                    # C'est pas un dossier, c'est un fichier alors, on le supprime
-                    os.remove(self._out_filename)
-                finally:
-                    os.mkdir(out_filename)
-        else:       # Resume download
-            # Load du fichier .info
-            conf_read = [line for line in open(out_filename + '/info')]
-            # Lit la config et la met dans le dico
-            for line in conf_read:
-                if "=" in line:
-                    #print "Splitting line"
-                    name, start = line.split("=")
-                    start = int(start)
-                    # Pour chaque partie regarde à quel bit ça c'est arreté
-                    size = os.path.getsize(name)
+                # C'est pas un dossier, c'est un fichier alors, on le supprime
+                os.remove(self._out_filename)
+            finally:
+                os.mkdir(out_filename)
 
-                    #print "Name = " +str(name) + " and start = " +str(start)
-                    self._data.append({'out': name, 'start': start, 'end': start + size, 'isFinished': True})
+    def _load_info(self):
+        # Lit la config et la met dans le dico
+        for line in open(self._out_filename + '/info'):
+            if "=" in line:
+                #print "Splitting line"
+                name, start = line.split("=")
+                start = int(start)
+                # Pour chaque partie regarde à quel bit ça c'est arreté
+                size = os.path.getsize(name)
 
-                    self._compteur += 1
-         
-        print self._data
+                #print "Name = " +str(name) + " and start = " +str(start)
+                self._data.append({'out': name, 'start': start, 'end': start + size, 'isFinished': True})
 
+                self._compteur += 1
+
+    def _do_distribution(self):
         # On récupère les morceaux restants à télécharger.
         whites = self._get_whites()
         # On les trie du plus gros au plus petit.
@@ -147,8 +133,25 @@ class QMultiSourceFtp(QObject):
         for w in whites:
             self._data.append({'url': w['url'], 'out': w['out'], 'start': w['start'], 'end': w['end'], 'isFinished': False})
 
-        print self._data
 
+    def get(self, urls, out_filename, resume=False):
+        self._compteur = 0
+        self._data = []
+        self._out_filename = out_filename
+        self._urls = urls
+
+        if not urls:
+            return
+
+        self._size = self._get_size(urls)
+
+        # Creating temporary folder
+        if resume:
+            self._load_info()
+        else: # Resume download
+            self._create_dir()
+         
+        self._do_distribution()
         self._start_all()
         self._write_config()
 
