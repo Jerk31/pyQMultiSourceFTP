@@ -134,6 +134,36 @@ class QMultiSourceFtp(QObject):
         for w in whites:
             self._data.append({'url': w['url'], 'out': w['out'], 'start': w['start'], 'end': w['end'], 'isFinished': False})
 
+    def _let_me_help(self, url):
+        chunks = sorted([d for d in self._data if not d['isFinished']],
+                key=lambda x: x['start'] + x['downloaded'] - x['end'])
+        data = chunks[0]
+        rest = data['end'] - (data['start'] + data['downloaded'])
+        if rest <= 10000:
+            return
+
+        end = data['start'] + data['downloaded'] + rest / 2
+        old_end = data['end']
+        data['ftp'].set_end(end)
+        data['end'] = end
+
+        self._compteur += 1
+        data = {'url': url, 'out': str(self._compteur) + '.part', 'start': end, 'end': old_end, 'isFinished': False}
+        self._data.append(data)
+        self._start_download(data)
+
+    def _start_download(self, data):
+        # FTP
+        ftp = DownloadPart(data['url'], self._out_filename + '/' + data['out'], data['start'], data['end'])
+        data['ftp'] = ftp
+        data['downloaded'] = 0
+        print "Lancement du download : " + data['out'] + " a partir de : "+ data['url'].path()
+        # Signaux
+        ftp.done.connect(self.download_finished)
+        ftp.dataTransferProgress.connect(self.data_transfer_progress)
+        ftp.stateChanged.connect(self.state_changed)       
+        ftp.start()
+
 
     def get(self, urls, out_filename, resume=False):
         self._compteur = 0
@@ -154,8 +184,6 @@ class QMultiSourceFtp(QObject):
          
         self._do_distribution()
 
-        print self._data
-
         self._start_all()
         self._write_config()
 
@@ -165,16 +193,7 @@ class QMultiSourceFtp(QObject):
 
         for data in self._data:
             if not data['isFinished']:
-                # FTP
-                ftp = DownloadPart(data['url'], self._out_filename + '/' + data['out'], data['start'], data['end'])
-                data['ftp'] = ftp
-                data['downloaded'] = 0
-                print "Lancement du download : " + data['out'] + " a partir de : "+ data['url'].path()
-                # Signaux
-                ftp.done.connect(self.download_finished)
-                ftp.dataTransferProgress.connect(self.data_transfer_progress)
-                ftp.stateChanged.connect(self.state_changed)       
-                ftp.start()
+                self._start_download(data)
 
     def _write_config(self):
         config = open(self._out_filename + '/info', 'w')
@@ -184,7 +203,7 @@ class QMultiSourceFtp(QObject):
  
     def _merge(self):
         # On fait une jolie liste sortie comme on veut
-        new_data = sorted(self._data, key=itemgetter('start')) 
+        new_data = sorted(self._data, key=itemgetter('start'))
         # On merge
         file_list = [self._out_filename + '/' + d['out'] for d in new_data]
         merge_files(file_list, self._out_filename + '.new')
@@ -195,6 +214,7 @@ class QMultiSourceFtp(QObject):
         # On supprime le fichier des parts s'il existe
 
     def download_finished(self, ok, instance):
+        #XXX: Gérer correctement le ok !
         print "f", ok, instance
 
         data = None
@@ -210,9 +230,13 @@ class QMultiSourceFtp(QObject):
             finished = finished and p['isFinished']
         # Si oui, on merge et on envoie le signal :)
         if finished:
+            #TODO reverification avant de merger !
+
             self._merge()
             print "FINI !!!!!!"
             self.done.emit(False)
+        else:
+            self._let_me_help(data['url'])
             
     def data_transfer_progress(self, read, total, instance):
         # TODO : optimiser tout ça, on ne devrait pas avoir à faire une boucle pour chercher la bonne data :/
@@ -223,7 +247,7 @@ class QMultiSourceFtp(QObject):
         currently_downloaded = 0
         for d in self._data:
             currently_downloaded += d['downloaded']
-        print "On a déjà téléchargé : " + str(currently_downloaded) + " sur : " + str(self._size)
+        #print "On a déjà téléchargé : " + str(currently_downloaded) + " sur : " + str(self._size)
         self.dataTransferProgress.emit(currently_downloaded, self._size)
         
     def state_changed(self, state):
