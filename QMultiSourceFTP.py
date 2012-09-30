@@ -46,7 +46,31 @@ class QMultiSourceFtp(QObject):
 
         return size
 
+    # Récupère les bouts restants :
+    def _get_whites(self):
+        whites = []
+
+        chunks = sorted(self._data, key=lambda x: x['start'])
+        size = self._size
+
+        if len(chunks) > 0:
+            if chunks[0]['start'] > 0:
+                whites.append({'start': 0, 'end': chunks[0][1], 'free': True})
+            
+            for i in range(len(chunks) - 1):
+                if chunks[i]['end'] < chunks[i+1][1]:
+                    whites.append({'start': chunks[i][2], 'end': chunks[i+1][1], 'free': True})
+            
+            if chunks[-1]['end'] < size:
+                whites.append({'start': chunks[-1][2], 'end': size, 'free': True})
+        else:
+            whites.append({'start': 0, 'end': size, 'free': True})
+
+        return whites
+
+
     def get(self, urls, out_filename, resume=False):
+        self._compteur = 0
         self._data = []
         self._out_filename = out_filename
         self._urls = urls
@@ -70,46 +94,84 @@ class QMultiSourceFtp(QObject):
                     os.remove(self._out_filename)
                 finally:
                     os.mkdir(out_filename)
-            # Dividing the task between the peers
-            size_unit = self._size/len(urls)
-            for i in range(len(urls)):
-                self._data.append({'start': size_unit * i, 'end': size_unit * (i + 1), 'isFinished': False, 'url': urls[i], 'out': str(i) + '.part'})
-                
         else:       # Resume download
             # Load du fichier .info
-            size_unit = self._size/len(urls)
-            #print "On ouvre le fichier " + out_file.fileName()+".info"
             conf_read = [line for line in open(out_filename + '/info')]
             # Lit la config et la met dans le dico
             for line in conf_read:
                 if "=" in line:
                     #print "Splitting line"
                     name, start = line.split("=")
-
+                    start = int(start)
                     # Pour chaque partie regarde à quel bit ça c'est arreté
                     size = os.path.getsize(name)
 
                     #print "Name = " +str(name) + " and start = " +str(start)
-                    self._data.append({'out': name, 'start': start, 'end': size, 'isFinished': True, 'old': True})
-                        
+                    self._data.append({'out': name, 'start': start, 'end': start + size, 'isFinished': True})
+
+                    self._compteur += 1
+         
+        print self._data
+
+        # On récupère les morceaux restants à télécharger.
+        whites = self._get_whites()
+        # On les trie du plus gros au plus petit.
+        whites.sort(key=lambda x: x['start'] - x['end'])
+
+        # Pour chaque adresse, on va lui affecter un morceau.
+        for url in self._urls:
+            affected = False
+            # On cherche un morceau libre.
+            for w in whites:
+                if w['free']:
+                    w['url'] = url
+                    w['free'] = False
+                    w['out'] = str(self._compteur) + '.part'
+                    affected = True
+                    break
+
+            # Si aucun morceau libre, on partage !
+            if not affected:
+              whites.sort(key=lambda x: x['start'] - x['end'])
+              s = whites[0]['end'] - whites[0]['start']
+              # Si le morceau mérite d'être partagé... (arbitraire)
+              if s > 10000:
+                  whites.append({'url': url, 'start': whites[0]['start'] + s / 2, 'end': whites[0]['end'], 'free': False, 'out': str(self._compteur) + '.part'})
+                  whites[0]['end'] = whites[0]['start'] + s / 2
+              else:
+                  # Pas assez de chose à partager.
+                  break
+
+            self._compteur += 1
+
+        for w in whites:
+            self._data.append({'url': w['url'], 'out': w['out'], 'start': w['start'], 'end': w['end'], 'isFinished': False})
+
+        print self._data
+
+        self._start_all()
+        self._write_config()
+
+    def _start_all(self):
         # Starting all downloads
         # Opening part index file
-        config = open(out_filename + '/info', 'w')
 
-        if config:
-            for data in self._data:
-                    # FTP
-                    data['ftp'] = DownloadPart(data['url'], out_filename + '/' + data['out'], data['start'], data['end'])
-                    ftp = data['ftp']
-                    # Creating File
-                    if open(data['out'], 'w'):
-                        print "Lancement du download : " + data['out'] + " a partir de : "+ data['url'].path()
-                        config.write(data['out'] + "=" + str(data['start']) +"\n")    
-                        # Signaux
-                        ftp.done.connect(self.download_finished)
-                        ftp.dataTransferProgress.connect(self.data_transfer_progress)
-                        ftp.stateChanged.connect(self.state_changed)       
-                        ftp.start()
+        for data in self._data:
+            if not data['isFinished']:
+                # FTP
+                ftp = DownloadPart(data['url'], self._out_filename + '/' + data['out'], data['start'], data['end'])
+                data['ftp'] = ftp
+                print "Lancement du download : " + data['out'] + " a partir de : "+ data['url'].path()
+                # Signaux
+                ftp.done.connect(self.download_finished)
+                ftp.dataTransferProgress.connect(self.data_transfer_progress)
+                ftp.stateChanged.connect(self.state_changed)       
+                ftp.start()
+
+    def _write_config(self):
+        config = open(self._out_filename + '/info', 'w')
+        for data in self._data:
+            config.write(data['out'] + "=" + str(data['start']) +"\n")    
         config.close()
  
     def _merge(self):
