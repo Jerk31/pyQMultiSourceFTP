@@ -11,8 +11,8 @@ from merge import merge_files
 
 class QMultiSourceFtp(QObject):
     """ Cette classe gère le téléchargement multi-source en utilisant
-		DownloadPart.
-		"""
+    DownloadPart.
+    """
     done                    = pyqtSignal(bool)
     stateChanged            = pyqtSignal(int)
     dataTransferProgress    = pyqtSignal(int, int)
@@ -61,16 +61,16 @@ class QMultiSourceFtp(QObject):
         if len(chunks) > 0:
             if chunks[0]['start'] > 0:
                 whites.append({'start': 0, 'end': chunks[0]['start'],
-												'free': True})
+                        'free': True})
             
             for i in range(len(chunks) - 1):
                 if chunks[i]['end'] < chunks[i+1]['start']:
                     whites.append({'start': chunks[i]['end'],
-														'end': chunks[i+1]['start'], 'free': True})
+                            'end': chunks[i+1]['start'], 'free': True})
             
             if chunks[-1]['end'] < size:
                 whites.append({'start': chunks[-1]['end'], 'end': size,
-												'free': True})
+                        'free': True})
         else:
             whites.append({'start': 0, 'end': size, 'free': True})
         return whites
@@ -102,7 +102,7 @@ class QMultiSourceFtp(QObject):
 
                 #print "Name = " +str(name) + " and start = " +str(start)
                 self._data.append({'out': name, 'start': start,
-												'end': start + size, 'isFinished': True, 'downloaded': size})
+                        'end': start + size, 'isFinished': True, 'downloaded': size})
 
                 self._compteur += 1
 
@@ -131,9 +131,9 @@ class QMultiSourceFtp(QObject):
                 # Si le morceau mérite d'être partagé... (arbitraire)
                 if s > 1000000:
                     whites.append({'url': url,
-														'start': whites[0]['start'] + s / 2,
-														'end': whites[0]['end'], 'free': False,
-														'out': str(self._compteur) + '.part'})
+                            'start': whites[0]['start'] + s / 2,
+                            'end': whites[0]['end'], 'free': False,
+                            'out': str(self._compteur) + '.part'})
                     whites[0]['end'] = whites[0]['start'] + s / 2
                 else:
                     # Pas assez de chose à partager.
@@ -143,7 +143,7 @@ class QMultiSourceFtp(QObject):
 
         for w in whites:
             self._data.append({'url': w['url'], 'out': w['out'],
-										'start': w['start'], 'end': w['end'], 'isFinished': False})
+                    'start': w['start'], 'end': w['end'], 'isFinished': False})
 
     def _let_me_help(self, url):
         chunks = sorted([d for d in self._data if not d['isFinished']],
@@ -160,18 +160,18 @@ class QMultiSourceFtp(QObject):
 
         self._compteur += 1
         data = {'url': url, 'out': str(self._compteur) + '.part', 'start': end,
-												'end': old_end, 'isFinished': False}
+                        'end': old_end, 'isFinished': False}
         self._data.append(data)
         self._start_download(data)
 
     def _start_download(self, data):
         # FTP
         ftp = DownloadPart(data['url'], self._out_filename + '/' + data['out'],
-												data['start'], data['end'])
+                        data['start'], data['end'])
         data['ftp'] = ftp
         data['downloaded'] = 0
         print("Lancement du download : " + data['out'] + " a partir de : " +
-												data['url'].path())
+                        data['url'].path())
         # Signaux
         ftp.done.connect(self.download_finished)
         ftp.dataTransferProgress.connect(self.data_transfer_progress)
@@ -254,7 +254,7 @@ class QMultiSourceFtp(QObject):
             
     def data_transfer_progress(self, read, total, instance):
         # TODO : optimiser tout ça, on ne devrait pas avoir à faire une boucle pour
-				# chercher la bonne data :/
+        # chercher la bonne data :/
         # On cherche la bonne data
         data = [d for d in self._data if 'ftp' in d and d['ftp'] == instance][0]
         data['downloaded'] = read
