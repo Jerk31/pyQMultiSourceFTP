@@ -37,6 +37,8 @@ class QMultiSourceFtp(QObject):
         self._read          = None
         self._is_downloading= False
         self._urls          = []
+        self._url_count     = dict()
+        self._blacklist     = []
  
     def _get_size(self, urls):
         # On récupère la taille du fichier distant
@@ -203,7 +205,8 @@ class QMultiSourceFtp(QObject):
     def manage_download(self, new_urls):
         if self._is_downloading:
             for url in new_urls:
-                self._let_me_help(url)
+                if url not in self._blacklist:
+                    self._let_me_help(url)
         
     def _start_all(self):
         # Starting all downloads
@@ -239,6 +242,14 @@ class QMultiSourceFtp(QObject):
         data = [d for d in self._data if 'ftp' in d and d['ftp'] == instance][0]
         # On met à jour le transfert qui vient de se finir
         data['isFinished'] = ok #XXX
+        # Si on avait mal fini on incrémente le compteur de l'url
+        if not ok:
+            # Si ce compteur est déjà égal à 1... blacklist
+            if data['url'] in self._url_count and self._url_count[data['url']] == 1:
+                self._blacklist.append(data['url'])
+                print ("Blacklisted : ", data['url'])
+            else:
+                self._url_count[data['url']] = 1   
         # On arrete le FTP
         data['ftp'].exit()
         # On vérifie que tous les transferts sont finis
@@ -252,8 +263,10 @@ class QMultiSourceFtp(QObject):
             self._merge()
             print "FINI !!!!!!"
             self.done.emit(False)
-        else:
+        elif data['url'] not in self._blacklist:
             self._let_me_help(data['url'])
+        else:
+            pass
             
     def data_transfer_progress(self, read, total, instance):
         # TODO : optimiser tout ça, on ne devrait pas avoir à faire une boucle pour
