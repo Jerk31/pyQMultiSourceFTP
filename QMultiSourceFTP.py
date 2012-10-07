@@ -35,6 +35,7 @@ class QMultiSourceFtp(QObject):
         self._size          = 0
         self._out_filename  = None
         self._read          = None
+        self._is_downloading= False
         self._urls          = []
  
     def _get_size(self, urls):
@@ -77,7 +78,7 @@ class QMultiSourceFtp(QObject):
     def _create_dir(self):
         out_filename = self._out_filename
         try:
-            print("Création du dossier " + str(out_filename))
+            #print("Création du dossier " + str(out_filename))
             os.mkdir(out_filename)
         except OSError:
             # On supprime le dossier existant et on en créé un autre
@@ -128,7 +129,7 @@ class QMultiSourceFtp(QObject):
                 whites.sort(key=lambda x: x['start'] - x['end'])
                 s = whites[0]['end'] - whites[0]['start']
                 # Si le morceau mérite d'être partagé... (arbitraire)
-                if s > 10000:
+                if s > 1000000:
                     whites.append({'url': url,
 														'start': whites[0]['start'] + s / 2,
 														'end': whites[0]['end'], 'free': False,
@@ -149,7 +150,7 @@ class QMultiSourceFtp(QObject):
                 key=lambda x: x['start'] + x['downloaded'] - x['end'])
         data = chunks[0]
         rest = data['end'] - (data['start'] + data['downloaded'])
-        if rest <= 10000:
+        if rest <= 1000000:
             return
 
         end = data['start'] + data['downloaded'] + rest / 2
@@ -190,9 +191,9 @@ class QMultiSourceFtp(QObject):
         self._size = self._get_size(urls)
 
         # Creating temporary folder
-        if resume:
+        if resume: # Resume download
             self._load_info()
-        else: # Resume download
+        else:
             self._create_dir()
          
         self._do_distribution()
