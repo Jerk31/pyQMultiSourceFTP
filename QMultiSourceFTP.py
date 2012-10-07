@@ -10,7 +10,9 @@ from DownloadPart import DownloadPart
 from merge import merge_files
 
 class QMultiSourceFtp(QObject):
-    """ Cette classe gère le téléchargement multi-source en utilisant DownloadPart """
+    """ Cette classe gère le téléchargement multi-source en utilisant
+		DownloadPart.
+		"""
     done                    = pyqtSignal(bool)
     stateChanged            = pyqtSignal(int)
     dataTransferProgress    = pyqtSignal(int, int)
@@ -33,6 +35,7 @@ class QMultiSourceFtp(QObject):
         self._size          = 0
         self._out_filename  = None
         self._read          = None
+        self._urls          = []
  
     def _get_size(self, urls):
         # On récupère la taille du fichier distant
@@ -56,23 +59,25 @@ class QMultiSourceFtp(QObject):
 
         if len(chunks) > 0:
             if chunks[0]['start'] > 0:
-                whites.append({'start': 0, 'end': chunks[0]['start'], 'free': True})
+                whites.append({'start': 0, 'end': chunks[0]['start'],
+												'free': True})
             
             for i in range(len(chunks) - 1):
                 if chunks[i]['end'] < chunks[i+1]['start']:
-                    whites.append({'start': chunks[i]['end'], 'end': chunks[i+1]['start'], 'free': True})
+                    whites.append({'start': chunks[i]['end'],
+														'end': chunks[i+1]['start'], 'free': True})
             
             if chunks[-1]['end'] < size:
-                whites.append({'start': chunks[-1]['end'], 'end': size, 'free': True})
+                whites.append({'start': chunks[-1]['end'], 'end': size,
+												'free': True})
         else:
             whites.append({'start': 0, 'end': size, 'free': True})
-        print "w:", whites
         return whites
 
     def _create_dir(self):
         out_filename = self._out_filename
         try:
-            print "Création du dossier " + str(out_filename)
+            print("Création du dossier " + str(out_filename))
             os.mkdir(out_filename)
         except OSError:
             # On supprime le dossier existant et on en créé un autre
@@ -95,7 +100,8 @@ class QMultiSourceFtp(QObject):
                 size = os.path.getsize(self._out_filename + '/' + name)
 
                 #print "Name = " +str(name) + " and start = " +str(start)
-                self._data.append({'out': name, 'start': start, 'end': start + size, 'isFinished': True, 'downloaded': size})
+                self._data.append({'out': name, 'start': start,
+												'end': start + size, 'isFinished': True, 'downloaded': size})
 
                 self._compteur += 1
 
@@ -119,20 +125,24 @@ class QMultiSourceFtp(QObject):
 
             # Si aucun morceau libre, on partage !
             if not affected:
-              whites.sort(key=lambda x: x['start'] - x['end'])
-              s = whites[0]['end'] - whites[0]['start']
-              # Si le morceau mérite d'être partagé... (arbitraire)
-              if s > 10000:
-                  whites.append({'url': url, 'start': whites[0]['start'] + s / 2, 'end': whites[0]['end'], 'free': False, 'out': str(self._compteur) + '.part'})
-                  whites[0]['end'] = whites[0]['start'] + s / 2
-              else:
-                  # Pas assez de chose à partager.
-                  break
+                whites.sort(key=lambda x: x['start'] - x['end'])
+                s = whites[0]['end'] - whites[0]['start']
+                # Si le morceau mérite d'être partagé... (arbitraire)
+                if s > 10000:
+                    whites.append({'url': url,
+														'start': whites[0]['start'] + s / 2,
+														'end': whites[0]['end'], 'free': False,
+														'out': str(self._compteur) + '.part'})
+                    whites[0]['end'] = whites[0]['start'] + s / 2
+                else:
+                    # Pas assez de chose à partager.
+                    break
 
             self._compteur += 1
 
         for w in whites:
-            self._data.append({'url': w['url'], 'out': w['out'], 'start': w['start'], 'end': w['end'], 'isFinished': False})
+            self._data.append({'url': w['url'], 'out': w['out'],
+										'start': w['start'], 'end': w['end'], 'isFinished': False})
 
     def _let_me_help(self, url):
         chunks = sorted([d for d in self._data if not d['isFinished']],
@@ -148,16 +158,19 @@ class QMultiSourceFtp(QObject):
         data['end'] = end
 
         self._compteur += 1
-        data = {'url': url, 'out': str(self._compteur) + '.part', 'start': end, 'end': old_end, 'isFinished': False}
+        data = {'url': url, 'out': str(self._compteur) + '.part', 'start': end,
+												'end': old_end, 'isFinished': False}
         self._data.append(data)
         self._start_download(data)
 
     def _start_download(self, data):
         # FTP
-        ftp = DownloadPart(data['url'], self._out_filename + '/' + data['out'], data['start'], data['end'])
+        ftp = DownloadPart(data['url'], self._out_filename + '/' + data['out'],
+												data['start'], data['end'])
         data['ftp'] = ftp
         data['downloaded'] = 0
-        print "Lancement du download : " + data['out'] + " a partir de : "+ data['url'].path()
+        print("Lancement du download : " + data['out'] + " a partir de : " +
+												data['url'].path())
         # Signaux
         ftp.done.connect(self.download_finished)
         ftp.dataTransferProgress.connect(self.data_transfer_progress)
@@ -239,7 +252,8 @@ class QMultiSourceFtp(QObject):
             self._let_me_help(data['url'])
             
     def data_transfer_progress(self, read, total, instance):
-        # TODO : optimiser tout ça, on ne devrait pas avoir à faire une boucle pour chercher la bonne data :/
+        # TODO : optimiser tout ça, on ne devrait pas avoir à faire une boucle pour
+				# chercher la bonne data :/
         # On cherche la bonne data
         data = [d for d in self._data if 'ftp' in d and d['ftp'] == instance][0]
         data['downloaded'] = read

@@ -1,11 +1,12 @@
 # coding=utf-8
 
 import ftplib, socket
-from PyQt4.QtCore import pyqtSignal, QThread
+from PyQt4.QtCore import QThread, pyqtSignal
 
 class DownloadPart(QThread):
-    """ Cette classe gère le téléchargement d'une partie de fichier """
-    """ Elle est basée sur ftplib """
+    """ Cette classe gère le téléchargement d'une partie de fichier
+    Elle est basée sur ftplib
+		"""
     dataTransferProgress = pyqtSignal(int, int, object)
     done                 = pyqtSignal(bool, object)
     stateChanged         = pyqtSignal(int)
@@ -40,7 +41,8 @@ class DownloadPart(QThread):
             self.stateChanged.emit(4)
             self.ftp.sendcmd("TYPE I")
             data_read = 0
-            conn = self.ftp.transfercmd('RETR ' + str(self.url.path()), rest=self._start)
+            conn = self.ftp.transfercmd('RETR ' + 
+														str(self.url.path()), rest=self._start)
             while data_read < self._to_read and not self.canceled:
                 chunk = conn.recv(8192)
                 size = min(self._to_read - data_read, len(chunk))
@@ -57,10 +59,10 @@ class DownloadPart(QThread):
             self.done.emit(not self.canceled, self)
             self.stateChanged.emit(0)
         except socket.error, (value, message):
-            print "erreur", message
+            print("erreur", message)
             self.stateChanged.emit(0)
             self.done.emit(False, self)
         except ftplib.error_perm, message:
-            print "erreur", message
+            print("erreur", message)
             self.stateChanged.emit(0)
             self.done.emit(False, self)
